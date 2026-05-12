@@ -6,8 +6,8 @@ const vscode = require('vscode');
 function buildWebviewHtml(webview, extensionUri) {
     const cssUri      = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chat.css'));
     const jsUri       = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chat.js'));
-    const logoUri     = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'logo_black_bg.png'));
-    const welcomeLogoUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'logo_black_bg.png'));
+    const logoUri     = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'imgs', 'logo_black_bg.png'));
+    const welcomeLogoUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'imgs', 'logo_black_bg.png'));
     const codiconUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'codicon.css'));
     const katexCssUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'katex.min.css'));
     const katexJsUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'katex.min.js'));

@@ -1104,6 +1104,17 @@
     var it = popItems[popSel];
     if (popKind === "slash"){
       if (it.expand === "__CLEAR__"){ hidePop(); inp.value = ""; cbt && cbt.click(); return; }
+      // Dynamic skill: send skillInvoke and clear the input.
+      if (it._skill) {
+        var skillToken = inp.value.slice(popTrigStart).replace(/^\S*\s?/, "");
+        var skillArgs  = inp.value.slice(0, popTrigStart).trim();
+        if (skillToken) skillArgs = (skillArgs ? skillArgs + " " : "") + skillToken;
+        inp.value = ""; autosize();
+        hidePop();
+        vscode.postMessage({ type: "skillInvoke", skillName: it.name.slice(1), args: skillArgs });
+        setTimeout(function(){ inp.focus(); }, 0);
+        return;
+      }
       // Replace "/xyz..." prefix at popTrigStart with the expansion text
       var before = inp.value.slice(0, popTrigStart);
       // Skip the trigger word (slash + non-space chars)
@@ -1201,7 +1212,8 @@
     inp.value = ""; autosize();
     var toSend = { type:"send", text:t };
     if (attachedFiles.length) {
-      toSend.attachments = attachedFiles.filter(function(f){ return f.content !== null; });
+      // Include text attachments (content loaded) and image attachments (imageData present).
+      toSend.attachments = attachedFiles.filter(function(f){ return f.content !== null || !!f.imageData; });
     }
     attachedFiles = []; renderChips();
     vscode.postMessage(toSend);
@@ -1541,11 +1553,14 @@
         if (merged.length) showPop(merged, "at", popTrigStart);
       }
     } else if (m.type === "fileContentResult"){
-      // Update the chip's content
+      // Update the chip's content or imageData
       for (var fi = 0; fi < attachedFiles.length; fi++) {
         if (attachedFiles[fi].path === m.path) {
           if (m.error) {
             attachedFiles.splice(fi, 1); // remove failed chip
+          } else if (m.imageData) {
+            attachedFiles[fi].content   = null;
+            attachedFiles[fi].imageData = m.imageData;
           } else {
             attachedFiles[fi].content = m.content || '';
           }
@@ -1553,6 +1568,23 @@
           break;
         }
       }
+    } else if (m.type === "skillList"){
+      // Merge dynamically discovered skills into SLASH_CMDS.
+      // Built-in static commands always take precedence; skills are appended.
+      var existingNames = SLASH_CMDS.map(function(c){ return c.name; });
+      (m.skills || []).forEach(function(sk){
+        var slashName = "/" + sk.name;
+        if (existingNames.indexOf(slashName) !== -1) return;
+        var shortDesc = sk.desc.length > 72 ? sk.desc.slice(0, 69) + "\u2026" : sk.desc;
+        SLASH_CMDS.push({
+          name:   slashName,
+          desc:   shortDesc,
+          hint:   sk.hint || "",
+          expand: null,    // not used for skills
+          _skill: true,    // marks this as a dynamic skill
+        });
+        existingNames.push(slashName);
+      });
     }
   });
 

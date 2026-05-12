@@ -16,7 +16,7 @@ const path   = require('path');
 const fs     = require('fs');
 
 const { Logger }           = require('../logger');
-const { wsRoot }           = require('../utils/paths');
+const { wsRoot, resolvePath } = require('../utils/paths');
 const { isZh }             = require('../utils/i18n');
 const { openFile }         = require('./openFile');
 const { buildWebviewHtml } = require('../webview/html');
@@ -111,7 +111,10 @@ class ChatViewProvider {
         this._view = webviewView;
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [vscode.Uri.joinPath(this._context.extensionUri, 'media')],
+            localResourceRoots: [
+                vscode.Uri.joinPath(this._context.extensionUri, 'media'),
+                vscode.Uri.joinPath(this._context.extensionUri, 'imgs'),
+            ],
         };
         webviewView.webview.html = buildWebviewHtml(webviewView.webview, this._context.extensionUri);
         webviewView.webview.onDidReceiveMessage(msg => this._onMessage(msg));
@@ -121,7 +124,10 @@ class ChatViewProvider {
         this._panel = panel;
         panel.webview.options = {
             enableScripts: true,
-            localResourceRoots: [vscode.Uri.joinPath(this._context.extensionUri, 'media')],
+            localResourceRoots: [
+                vscode.Uri.joinPath(this._context.extensionUri, 'media'),
+                vscode.Uri.joinPath(this._context.extensionUri, 'imgs'),
+            ],
         };
         panel.webview.html = buildWebviewHtml(panel.webview, this._context.extensionUri);
         panel.webview.onDidReceiveMessage(msg => this._onMessage(msg));
@@ -136,6 +142,12 @@ class ChatViewProvider {
                 this._store.postList();
                 if (!this._store.sessionId) this._post({ type: 'sessionLoaded', id: null, messages: [] });
                 this._refreshBalance(false);
+                // Push discovered skills to the webview for slash-command autocomplete.
+                try {
+                    const { discoverSkills } = require('../skills');
+                    const skills = discoverSkills().map(s => ({ name: s.name, desc: s.desc, hint: s.hint }));
+                    if (skills.length) this._post({ type: 'skillList', skills });
+                } catch { /* non-fatal: skill discovery failures must not break startup */ }
                 break;
             }
             case 'balanceRefresh': this._refreshBalance(true); break;
@@ -196,13 +208,45 @@ class ChatViewProvider {
                 break;
             }
             case 'fileContent': {
-                const rel = String(msg.path || '');
-                let content = '', error = '';
+                const rel    = String(msg.path || '');
+                let content  = '', error = '', imageData = '';
+                // Image and binary detection by extension.
+                const IMAGE_EXTS  = new Set(['png','jpg','jpeg','gif','bmp','webp','tiff','tif','ico']);
+                const BINARY_EXTS = new Set(['pdf','zip','tar','gz','7z','rar','exe','dll','so','wasm',
+                                             'mp4','mp3','wav','mov','avi','pt','pth','onnx','pkl','bin']);
                 try {
-                    content = fs.readFileSync(path.join(wsRoot(), rel), 'utf8');
-                    if (content.length > 65536) content = content.slice(0, 65536) + '\n... [truncated]';
+                    // resolvePath handles both absolute and relative paths correctly.
+                    const fp  = resolvePath(rel);
+                    const ext = path.extname(fp).slice(1).toLowerCase();
+                    if (IMAGE_EXTS.has(ext)) {
+                        const buf  = fs.readFileSync(fp);
+                        const mime = `image/${ext === 'jpg' ? 'jpeg' : (ext === 'tif' ? 'tiff' : ext)}`;
+                        imageData  = `data:${mime};base64,${buf.toString('base64')}`;
+                    } else if (BINARY_EXTS.has(ext)) {
+                        error = `Binary file (.${ext}) — cannot attach as text. Use a path reference instead.`;
+                    } else {
+                        content = fs.readFileSync(fp, 'utf8');
+                        if (content.length > 65536) content = content.slice(0, 65536) + '\n... [truncated]';
+                    }
                 } catch (e) { error = e.message; }
-                this._post({ type: 'fileContentResult', path: rel, content, error });
+                this._post({ type: 'fileContentResult', path: rel, content, error, imageData });
+                break;
+            }
+            case 'skillInvoke': {
+                // User selected a dynamic skill from the slash-command popup.
+                // msg.skillName: skill directory name, msg.args: optional user arguments.
+                try {
+                    const { discoverSkills } = require('../skills');
+                    const sk = discoverSkills().find(s => s.name === msg.skillName);
+                    if (sk) {
+                        // Strip frontmatter, substitute $ARGUMENTS, then send as a normal user turn.
+                        const body = sk.content.replace(/^---[\s\S]*?---\r?\n/, '').trim();
+                        const prompt = body.replace(/\$ARGUMENTS/g, (msg.args || '').trim());
+                        this._loop.handleSend(prompt);
+                    }
+                } catch (e) {
+                    this._post({ type: 'error', text: `Skill invoke failed: ${e.message}` });
+                }
                 break;
             }
         }

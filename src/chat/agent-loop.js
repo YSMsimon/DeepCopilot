@@ -79,11 +79,13 @@ class AgentLoop {
         // Build attachment block (active editor context)
         const attachment = this._buildAttachment(this._getIncludeCtx());
         let attachmentBlocks = attachment ? attachment + '\n\n' : '';
-        if (attachments && attachments.length) {
+        // Separate text attachments from image attachments (imageData = base64 data URI).
+        const imageAttachments = (attachments || []).filter(a => a && a.imageData);
+        const textAttachments  = (attachments || []).filter(a => a && !a.imageData && a.path);
+        if (textAttachments.length) {
             const MAX_TOTAL = 256 * 1024;
             let totalSize = 0;
-            for (const a of attachments) {
-                if (!a || !a.path) continue;
+            for (const a of textAttachments) {
                 const block = `<attachment path="${a.path}">\n${a.content || '(empty)'}\n</attachment>`;
                 if (totalSize + block.length > MAX_TOTAL) {
                     attachmentBlocks += `<attachment path="${a.path}">(truncated — total attachment budget exceeded)</attachment>\n\n`;
@@ -93,7 +95,19 @@ class AgentLoop {
                 totalSize += block.length;
             }
         }
-        const userContent = attachmentBlocks ? attachmentBlocks + text : text;
+        const fullText = attachmentBlocks ? attachmentBlocks + text : text;
+
+        // Build content: array (multimodal) when images present, plain string otherwise.
+        // DeepSeek vision API accepts the standard OpenAI image_url content block format.
+        let userContent;
+        if (imageAttachments.length > 0) {
+            userContent = [{ type: 'text', text: fullText }];
+            for (const img of imageAttachments) {
+                userContent.push({ type: 'image_url', image_url: { url: img.imageData } });
+            }
+        } else {
+            userContent = fullText;
+        }
 
         run.reply = { user: text, asst: '', thoughts: '' };
         run.messages.push({ role: 'user', content: userContent });

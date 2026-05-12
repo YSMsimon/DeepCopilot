@@ -191,9 +191,9 @@ function activate(context) {
             const panel = vscode.window.createWebviewPanel(
                 'deepseek.chatPanel', 'Deep Copilot',
                 { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
-                { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')] }
+                { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media'), vscode.Uri.joinPath(context.extensionUri, 'imgs')] }
             );
-            try { panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'logo_black_bg.png'); } catch (_) {}
+            try { panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'imgs', 'logo_black_bg.png'); } catch (_) {}
             activeTabPanel = panel;
             panel.onDidDispose(() => { if (activeTabPanel === panel) activeTabPanel = null; });
             chatProvider.bindPanel(panel);
