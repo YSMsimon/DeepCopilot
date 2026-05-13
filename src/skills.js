@@ -14,8 +14,12 @@ const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
 
+// Default skills directory created by this extension on first activation.
+const DEEPCOPILOT_SKILLS_DIR = path.join(os.homedir(), '.deepcopilot', 'skills');
+
 // Directories scanned in order; first match wins for duplicate skill names.
 const SKILL_DIRS = [
+    DEEPCOPILOT_SKILLS_DIR,
     path.join(os.homedir(), '.claude',  'skills'),
     path.join(os.homedir(), '.copilot', 'skills'),
 ];
@@ -75,4 +79,4 @@ function discoverSkills() {
     return result;
 }
 
-module.exports = { discoverSkills };
+module.exports = { discoverSkills, DEEPCOPILOT_SKILLS_DIR };

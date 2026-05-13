@@ -193,7 +193,7 @@ class ChatViewProvider {
                                 : rawBody + (userArg ? `\n\nUser argument: ${userArg}` : '');
                             skillContent = { _skillName: msg.skillName, body };
                         } else {
-                            this._post({ type: 'error', text: `Skill "${msg.skillName}" not found — check ~/.claude/skills or ~/.copilot/skills` });
+                            this._post({ type: 'error', text: `Skill "${msg.skillName}" not found — check ~/.deepcopilot/skills (or ~/.claude/skills)` });
                         }
                     } catch (e) {
                         this._post({ type: 'error', text: `Skill load failed: ${e.message}` });

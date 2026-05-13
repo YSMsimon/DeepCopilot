@@ -12,6 +12,15 @@ function activate(context) {
     Logger.init(context);
     Logger.info('ACTIVATE', { version: (context.extension && context.extension.packageJSON && context.extension.packageJSON.version) || 'unknown' });
 
+    // ─── Ensure ~/.deepcopilot/skills directory exists ────────────────────
+    try {
+        const { DEEPCOPILOT_SKILLS_DIR } = require('./skills');
+        const fs = require('fs');
+        if (!fs.existsSync(DEEPCOPILOT_SKILLS_DIR)) {
+            fs.mkdirSync(DEEPCOPILOT_SKILLS_DIR, { recursive: true });
+        }
+    } catch { /* non-fatal */ }
+
     // ─── Status bar button (registered FIRST so it shows even if anything below throws) ──
     // VS Code persists per-user "hide" state for status bar items keyed by `id`.
     // We use a stable id + explicit `name` so users can find & re-enable it via

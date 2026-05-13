@@ -128,6 +128,25 @@
 
 ---
 
+## Phase 3: Deep Novelty Verification Results
+
+### KL-NO — NOVELTY CONFIRMED
+- **RNO** (Recurrent Neural Operators, arXiv 2505.20721, May 2025): Uses recurrent training on model-generated states for stability. Does NOT use Koopman theory or Lyapunov constraints. Complementary approach — could potentially be combined.
+- **Spectral Generator NO** (arXiv 2602.18801, Feb 2025): Provides stability conditions via spectral analysis of generator, not Lyapunov. No Koopman linearization.
+- **Verdict**: No existing work combines Koopman operator linearization + Lyapunov stability constraints for operator learning. **Clean novelty**.
+
+### SANO — NOVELTY CONFIRMED (with caveat)
+- **GAFNO** (IEEE 2024): Gated adaptive FNO that filters high-frequency noise per dataset. Gates within Fourier domain only, not across transform types.
+- **AdaptFNO** (ML4PS Workshop 2025): Adaptive spectral resolution via global/local operator split + cross-attention. Different mechanism.
+- **Verdict**: Cross-transform gating (Fourier/Wavelet/Spatial) is novel, but differentiation from GAFNO must be sharpened.
+
+### CFSP — NOVELTY CONFIRMED
+- **Unsupervised pretraining for operators** (NeurIPS 2024): Uses masked reconstruction, not contrastive.
+- **Lie symmetry augmentation** for neural PDE solvers exists but not combined with contrastive operator pretraining.
+- **Verdict**: Contrastive function-space pretraining with Lie augmentations is novel, but must beat simpler masked pretraining baselines.
+
+---
+
 ## Next Steps
 
 - [ ] `/research-review` on KL-NO (top idea) for critical feedback
