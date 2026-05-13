@@ -1472,7 +1472,15 @@
       if (curThk && curThk.style.display === "block") curThk.scrollTop = curThk.scrollHeight;
       ascroll();
     } else if (m.type === "toolStart"){
-      addToolLine(m.id, m.name, m.args);
+      /* Shell, web-search and sub-agent calls get an expandable card so the
+         user can click to see the full output. Everything else stays as a
+         lightweight prose line (GH Copilot convention). */
+      var _cardTools = { run_shell:1, web_search:1, spawn_agent:1 };
+      if (_cardTools[m.name]) {
+        addToolCard(m.id, m.name, m.args);
+      } else {
+        addToolLine(m.id, m.name, m.args);
+      }
     } else if (m.type === "approvalRequest"){
       addToolCard(m.id, m.name, m.args, { approval:true });
     } else if (m.type === "autoApproval"){
@@ -1545,13 +1553,29 @@
           var wLines = wContent ? wContent.split(/\r?\n/).length : 0;
           resTxt = wLines ? "+" + wLines + " lines" : "ok";
         } catch(e){ resTxt = "ok"; }
+      } else if (m.ok && (m.name === "spawn_agent" || tc.name === "spawn_agent")){
+        /* Sub-agent result is Markdown — render it, show iter/tool counts from metadata header */
+        var itersMatch = out.match(/\((\d+) tool calls[^)]*\)/);
+        resTxt = itersMatch ? itersMatch[0] : "done";
       } else {
         resTxt = m.ok ? (lines>1 ? lines + " lines" : (bytes ? bytes + "B" : "ok")) : "failed";
       }
       tc.status.textContent = resTxt;
       if (!tc.isLine && tc.body) {
-        tc.root.classList.remove("open");
-        tc.body.textContent = out;
+        /* spawn_agent returns Markdown — render it inside the card body */
+        if (tc.name === "spawn_agent" || m.name === "spawn_agent") {
+          tc.body.innerHTML = renderMd(out);
+          tc.root.classList.add("open");
+        } else {
+          tc.body.textContent = out;
+          /* Auto-expand shell/web-search cards so output is immediately visible.
+             User can collapse by clicking the header. */
+          if (out && (tc.name === "run_shell" || tc.name === "web_search")) {
+            tc.root.classList.add("open");
+          } else {
+            tc.root.classList.remove("open");
+          }
+        }
       }
       ascroll();
     } else if (m.type === "plan"){
