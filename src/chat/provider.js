@@ -179,14 +179,16 @@ class ChatViewProvider {
                     try {
                         const { discoverSkills } = require('../skills');
                         const sk = discoverSkills().find(s => s.name === msg.skillName);
-                        if (sk) {
-                            // Strip frontmatter, substitute $ARGUMENTS with the user's message.
-                            const body = sk.content.replace(/^---[\s\S]*?---\r?\n/, '').trim();
-                            skillContent = body.replace(/\$ARGUMENTS/g, (msg.text || '').trim());
+                        const rawBody = sk
+                            ? sk.content.replace(/^---[\s\S]*?---\r?\n/, '').trim()
+                            : msg.skillContent.replace(/^---[\s\S]*?---\r?\n/, '').trim();
+                        const userArg = (msg.text || '').trim();
+                        // Substitute $ARGUMENTS; if the placeholder isn't present, append the
+                        // user's text explicitly so the topic is always in the skill context.
+                        if (rawBody.includes('$ARGUMENTS')) {
+                            skillContent = rawBody.replace(/\$ARGUMENTS/g, userArg);
                         } else {
-                            // Fallback: use the content the webview already carries.
-                            skillContent = msg.skillContent.replace(/^---[\s\S]*?---\r?\n/, '').trim()
-                                              .replace(/\$ARGUMENTS/g, (msg.text || '').trim());
+                            skillContent = rawBody + (userArg ? `\n\nUser argument: ${userArg}` : '');
                         }
                     } catch (e) {
                         this._post({ type: 'error', text: `Skill load failed: ${e.message}` });

@@ -95,9 +95,22 @@ class AgentLoop {
                 totalSize += block.length;
             }
         }
-        // Skill content is injected as hidden context (never shown in chat bubbles).
-        const skillBlock = skillContent ? `<skill-context>\n${skillContent}\n</skill-context>\n\n` : '';
-        const fullText = skillBlock + (attachmentBlocks ? attachmentBlocks + text : text);
+        // Skill content is injected as an executable instruction (never echoed to the chat bubble).
+        // We put the skill workflow AFTER attachment context but treat the whole block as the
+        // authoritative instruction — the model must execute the pipeline, not just answer.
+        let fullText;
+        if (skillContent) {
+            // Attachments / editor context come first as reference material.
+            const contextBlock = attachmentBlocks || '';
+            // Skill body already has $ARGUMENTS substituted with the user's text.
+            // Wrap with an imperative header so the model knows to run the workflow.
+            fullText = contextBlock +
+                `You MUST execute the following skill workflow step by step. ` +
+                `Do NOT simply answer the user's question — follow every phase described below.\n\n` +
+                skillContent;
+        } else {
+            fullText = attachmentBlocks ? attachmentBlocks + text : text;
+        }
 
         // Build content: array (multimodal) when images present, plain string otherwise.
         // DeepSeek vision API accepts the standard OpenAI image_url content block format.
