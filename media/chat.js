@@ -1225,8 +1225,8 @@
       toSend.attachments = attachedFiles.filter(function(f){ return f.content !== null || !!f.imageData; });
     }
     if (pendingSkill) {
-      toSend.skillName    = pendingSkill.name;
-      toSend.skillContent = pendingSkill.content;
+      // Only send the skill name — provider.js reads the full content from disk.
+      toSend.skillName = pendingSkill.name;
       pendingSkill = null;
     }
     attachedFiles = []; renderChips();

@@ -143,6 +143,9 @@ class ChatViewProvider {
                 if (!this._store.sessionId) this._post({ type: 'sessionLoaded', id: null, messages: [] });
                 this._refreshBalance(false);
                 // Push discovered skills to the webview for slash-command autocomplete.
+                // NOTE: content is intentionally omitted here — the webview only needs name/desc/hint
+                // for the popup UI. When the user sends a skill, provider.js re-reads the full
+                // content from disk via discoverSkills() using msg.skillName as the key.
                 try {
                     const { discoverSkills } = require('../skills');
                     const skills = discoverSkills().map(s => ({ name: s.name, desc: s.desc, hint: s.hint }));
@@ -175,19 +178,23 @@ class ChatViewProvider {
             case 'openFile':        openFile(msg.path, msg.line); break;
             case 'send': {
                 let skillContent = null;
-                if (msg.skillContent) {
+                // msg.skillName is set when a skill chip was staged in the input box.
+                // Always resolve skill content from disk (via discoverSkills) — the webview
+                // does NOT carry the full SKILL.md body (it only has name/desc/hint for the UI).
+                if (msg.skillName) {
                     try {
                         const { discoverSkills } = require('../skills');
                         const sk = discoverSkills().find(s => s.name === msg.skillName);
-                        const rawBody = sk
-                            ? sk.content.replace(/^---[\s\S]*?---\r?\n/, '').trim()
-                            : msg.skillContent.replace(/^---[\s\S]*?---\r?\n/, '').trim();
-                        const userArg = (msg.text || '').trim();
-                        const body = rawBody.includes('$ARGUMENTS')
-                            ? rawBody.replace(/\$ARGUMENTS/g, userArg)
-                            : rawBody + (userArg ? `\n\nUser argument: ${userArg}` : '');
-                        // Wrap as object so agent-loop can inject as synthetic tool call + result.
-                        skillContent = { _skillName: msg.skillName || 'skill', body };
+                        if (sk) {
+                            const rawBody = sk.content.replace(/^---[\s\S]*?---\r?\n/, '').trim();
+                            const userArg = (msg.text || '').trim();
+                            const body = rawBody.includes('$ARGUMENTS')
+                                ? rawBody.replace(/\$ARGUMENTS/g, userArg)
+                                : rawBody + (userArg ? `\n\nUser argument: ${userArg}` : '');
+                            skillContent = { _skillName: msg.skillName, body };
+                        } else {
+                            this._post({ type: 'error', text: `Skill "${msg.skillName}" not found — check ~/.claude/skills or ~/.copilot/skills` });
+                        }
                     } catch (e) {
                         this._post({ type: 'error', text: `Skill load failed: ${e.message}` });
                     }
