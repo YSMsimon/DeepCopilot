@@ -95,22 +95,13 @@ class AgentLoop {
                 totalSize += block.length;
             }
         }
-        // Skill content is injected as an executable instruction (never echoed to the chat bubble).
-        // We put the skill workflow AFTER attachment context but treat the whole block as the
-        // authoritative instruction — the model must execute the pipeline, not just answer.
-        let fullText;
+        // Skill content is stored as a one-shot system instruction (never in the user bubble).
+        // It will be appended to sysPrompt on iter==1 only, so the model treats it as
+        // authoritative instructions — matching how Claude Code / GitHub Copilot handle skills.
         if (skillContent) {
-            // Attachments / editor context come first as reference material.
-            const contextBlock = attachmentBlocks || '';
-            // Skill body already has $ARGUMENTS substituted with the user's text.
-            // Wrap with an imperative header so the model knows to run the workflow.
-            fullText = contextBlock +
-                `You MUST execute the following skill workflow step by step. ` +
-                `Do NOT simply answer the user's question — follow every phase described below.\n\n` +
-                skillContent;
-        } else {
-            fullText = attachmentBlocks ? attachmentBlocks + text : text;
+            run._skillInstruction = skillContent;
         }
+        const fullText = attachmentBlocks ? attachmentBlocks + text : text;
 
         // Build content: array (multimodal) when images present, plain string otherwise.
         // DeepSeek vision API accepts the standard OpenAI image_url content block format.
@@ -188,7 +179,18 @@ class AgentLoop {
                     }
                 }
 
-                const msgs = [{ role: 'system', content: sysPrompt }, ...run.messages];
+                // On the first iteration only, append the skill instruction to the system prompt.
+                // This matches the GitHub Copilot / Claude Code pattern: skill = system-level authority.
+                let effectiveSysPrompt = sysPrompt;
+                if (iter === 1 && run._skillInstruction) {
+                    effectiveSysPrompt = sysPrompt +
+                        '\n\n---\n## Active Skill Workflow\n\n' +
+                        'The user has activated a skill. You MUST follow the workflow below step by step. ' +
+                        'Do NOT simply answer the question — execute every phase described.\n\n' +
+                        run._skillInstruction;
+                    delete run._skillInstruction; // fire once only
+                }
+                const msgs = [{ role: 'system', content: effectiveSysPrompt }, ...run.messages];
                 let assistantText = '';
                 let reasoningText = '';
                 Logger.info('ITER_START', { sid, iter, msg_count: msgs.length, est_tokens: estimateMessagesTokens(msgs) });
@@ -233,7 +235,7 @@ class AgentLoop {
                 if (ctxLimitHit) break; // break while loop — do not call the API
 
                 // Rebuild msgs in case pre-flight compaction modified run.messages
-                const finalMsgs = [{ role: 'system', content: sysPrompt }, ...run.messages];
+                const finalMsgs = [{ role: 'system', content: effectiveSysPrompt }, ...run.messages];
 
                 const iterT0 = Date.now();
 
