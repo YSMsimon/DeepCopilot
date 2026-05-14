@@ -21,7 +21,7 @@
 
 ---
 
-## � API Keys Required · 需要配置的 API Key
+## 🔑 API Keys Required · 需要配置的 API Key
 
 开始使用前只需准备以下 Key（最少只需第一个）：  
 You only need the following keys to get started — at minimum just the first one:
