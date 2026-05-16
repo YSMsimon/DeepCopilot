@@ -16,7 +16,7 @@ const path   = require('path');
 const fs     = require('fs');
 
 const { Logger }           = require('../logger');
-const { wsRoot, resolvePath } = require('../utils/paths');
+const { wsRoot, resolvePath, isInsideWorkspace } = require('../utils/paths');
 const { isZh }             = require('../utils/i18n');
 const { openFile }         = require('./openFile');
 const { buildWebviewHtml } = require('../webview/html');
@@ -383,6 +383,87 @@ class ChatViewProvider {
             }
         }
         this._loop.handleSend(newText);
+    }
+
+    // ─── Public API for extension commands ──────────────────────────────────
+
+    /**
+     * Read the active editor selection (or entire file if nothing selected)
+     * and push an addAttachment message to the webview.
+     * Called by the deepseekAgent.attachSelection command.
+     */
+    attachSelection() {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage(
+                isZh() ? 'Deep Copilot: 请先在编辑器中打开一个文件' : 'Deep Copilot: Open a file in the editor first'
+            );
+            return;
+        }
+        const doc = editor.document;
+        if (doc.uri.scheme !== 'file' && doc.uri.scheme !== 'untitled') return;
+
+        const abs  = doc.fileName;
+        const root = wsRoot();
+        // Security: reject paths outside the workspace
+        if (doc.uri.scheme === 'file' && root && !isInsideWorkspace(abs)) {
+            vscode.window.showWarningMessage(
+                isZh() ? 'Deep Copilot: 只能附加工作区内的文件' : 'Deep Copilot: Only files inside the workspace can be attached'
+            );
+            return;
+        }
+
+        const rel  = root && abs.startsWith(root)
+            ? path.relative(root, abs).replace(/\\/g, '/')
+            : path.basename(abs);
+        const lang = doc.languageId;
+        const sel  = editor.selection;
+
+        let content, startLine, endLine;
+        if (!sel.isEmpty) {
+            content   = doc.getText(sel);
+            startLine = sel.start.line + 1;  // convert to 1-based
+            endLine   = sel.end.line + 1;
+            if (content.length > 12000) content = content.slice(0, 12000) + '\n... [截断]';
+        } else {
+            content = doc.getText();
+            if (content.length > 65536) content = content.slice(0, 65536) + '\n... [截断]';
+        }
+
+        this._post({ type: 'addAttachment', payload: { path: rel, content, startLine, endLine, lang } });
+        // Focus the chat panel so the user can see the chip was added
+        vscode.commands.executeCommand('deepseek.chatView.focus').then(() => {}, () => {});
+    }
+
+    /**
+     * Called by the selection-change listener (auto, ~300ms debounce).
+     * Replaces any previous live selection chip in the webview.
+     * @param {import('vscode').TextEditor} [editor]
+     */
+    attachLiveSelection(editor) {
+        if (!editor) editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const doc = editor.document;
+        if (doc.uri.scheme !== 'file' && doc.uri.scheme !== 'untitled') return;
+        const abs  = doc.fileName;
+        const root = wsRoot();
+        if (doc.uri.scheme === 'file' && root && !isInsideWorkspace(abs)) return;
+        const rel  = root && abs.startsWith(root)
+            ? path.relative(root, abs).replace(/\\/g, '/')
+            : path.basename(abs);
+        const lang = doc.languageId;
+        const sel  = editor.selection;
+        if (sel.isEmpty) { this.clearLiveSelection(); return; }
+        let content = doc.getText(sel);
+        const startLine = sel.start.line + 1;
+        const endLine   = sel.end.line + 1;
+        if (content.length > 12000) content = content.slice(0, 12000) + '\n... [截断]';
+        this._post({ type: 'setLiveSelection', payload: { path: rel, content, startLine, endLine, lang } });
+    }
+
+    /** Remove the live selection chip from the webview. */
+    clearLiveSelection() {
+        this._post({ type: 'clearLiveSelection' });
     }
 
     _buildAttachmentBlock(heavy) {

@@ -233,6 +233,30 @@ function activate(context) {
         })
     );
 
+    // Attach selection / file to chat (editor context menu + command palette)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('deepseekAgent.attachSelection', () => {
+            chatProvider.attachSelection();
+        })
+    );
+
+    // Auto-attach live selection chip when the user selects text in any editor
+    let _selDebounce = null;
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection(e => {
+            if (_selDebounce) clearTimeout(_selDebounce);
+            _selDebounce = setTimeout(() => {
+                _selDebounce = null;
+                const sel = e.selections && e.selections[0];
+                if (sel && !sel.isEmpty) {
+                    chatProvider.attachLiveSelection(e.textEditor);
+                } else {
+                    chatProvider.clearLiveSelection();
+                }
+            }, 300);
+        })
+    );
+
     // Sidebar WebviewView (Activity Bar — left)
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(

@@ -1192,6 +1192,8 @@
   // ── @file chips (attached files) ──────────────────────────────────────
   var atChipsEl = document.getElementById("at-chips");
   var attachedFiles = []; // [{ path, content }]
+  var liveSelection = null; // { path, content, startLine, endLine, lang } — auto-synced with editor selection
+  var _pendingAttachments = null; // snapshot of chips at send time, used to render in the sent bubble
   var pendingSkill  = null; // { name, content } — staged skill chip
 
   function renderSkillNotice() {
@@ -1207,12 +1209,36 @@
 
   function renderChips() {
     if (!atChipsEl) return;
+    var liveHtml = '';
+    if (liveSelection) {
+      var lsName = liveSelection.path.replace(/^.*[\\/]/, '');
+      var lsLine = (liveSelection.startLine !== undefined && liveSelection.endLine !== undefined)
+        ? '<span class="chip-line">:' + liveSelection.startLine + (liveSelection.endLine !== liveSelection.startLine ? '-' + liveSelection.endLine : '') + '</span>'
+        : '';
+      liveHtml = '<span class="chip chip-live" title="'+escHtml(liveSelection.path)+'">' +
+        '✏️ ' + escHtml(lsName) + lsLine +
+        ' <button class="chip-x chip-x-live" title="取消选区">×</button></span>';
+    }
     var html = attachedFiles.map(function(f, i){
       var name = f.path.replace(/^.*[\\/]/, '');
-      return '<span class="chip" data-i="'+i+'" title="'+f.path+'">📄 '+name+' <button class="chip-x" data-i="'+i+'" title="移除">×</button></span>';
+      var isLoading = f.content === null && !f.imageData;
+      var lineLabel = (f.startLine !== undefined && f.endLine !== undefined)
+        ? '<span class="chip-line">:' + f.startLine + (f.endLine !== f.startLine ? '-' + f.endLine : '') + '</span>'
+        : '';
+      if (f.imageData) {
+        return '<span class="chip" data-i="'+i+'" title="'+escHtml(f.path)+'">' +
+          '<img class="chip-img" src="'+f.imageData+'" alt=""/> ' +
+          escHtml(name) + lineLabel +
+          ' <button class="chip-x" data-i="'+i+'" title="\u79fb\u9664">\u00d7</button></span>';
+      }
+      return '<span class="chip' + (isLoading ? ' loading' : '') + '" data-i="'+i+'" title="'+escHtml(f.path)+'">' +
+        (isLoading ? '<span class="chip-spin">\u29d6</span>' : '\ud83d\udcc4') +
+        ' ' + escHtml(name) + lineLabel +
+        ' <button class="chip-x" data-i="'+i+'" title="\u79fb\u9664">\u00d7</button></span>';
     }).join('');
-    if (!html) { atChipsEl.innerHTML = ""; atChipsEl.style.display = "none"; }
-    else { atChipsEl.style.display = "flex"; atChipsEl.innerHTML = html; }
+    var combined = liveHtml + html;
+    if (!combined) { atChipsEl.innerHTML = ""; atChipsEl.style.display = "none"; }
+    else { atChipsEl.style.display = "flex"; atChipsEl.innerHTML = combined; }
     renderSkillNotice();
   }
 
@@ -1224,6 +1250,9 @@
   atChipsEl && atChipsEl.addEventListener("click", function(e){
     var btn = e.target.closest(".chip-x");
     if (!btn) return;
+    if (btn.classList.contains("chip-x-live")) {
+      liveSelection = null; renderChips(); return;
+    }
     removeChip(parseInt(btn.getAttribute("data-i"), 10));
   });
 
@@ -1404,16 +1433,21 @@
        message survives session switches (replayed from the run's event log). */
     inp.value = ""; autosize();
     var toSend = { type:"send", text:t };
-    if (attachedFiles.length) {
-      // Include text attachments (content loaded) and image attachments (imageData present).
-      toSend.attachments = attachedFiles.filter(function(f){ return f.content !== null || !!f.imageData; });
-    }
+    var _allAtt = [];
+    if (liveSelection) _allAtt.push(liveSelection);
+    _allAtt = _allAtt.concat(attachedFiles.filter(function(f){ return f.content !== null || !!f.imageData; }));
+    if (_allAtt.length) { toSend.attachments = _allAtt; }
+    // Snapshot visible chips so we can render them in the sent message bubble
+    var _snapAtt = [];
+    if (liveSelection) _snapAtt.push(liveSelection);
+    _snapAtt = _snapAtt.concat(attachedFiles);
+    _pendingAttachments = _snapAtt.length ? _snapAtt : null;
     if (pendingSkill) {
       // Only send the skill name — provider.js reads the full content from disk.
       toSend.skillName = pendingSkill.name;
       pendingSkill = null;
     }
-    attachedFiles = []; renderChips();
+    liveSelection = null; attachedFiles = []; renderChips();
     vscode.postMessage(toSend);
   }
   function resetChat(){
@@ -1508,6 +1542,23 @@
       thk.style.display = m.show ? "block" : "none";
     } else if (m.type === "userEcho"){
       add("user", m.text || "");
+      if (_pendingAttachments && _pendingAttachments.length) {
+        var _allU = msgs.querySelectorAll(".msgU");
+        var _lastU = _allU[_allU.length - 1];
+        if (_lastU) {
+          var _atDiv = document.createElement("div");
+          _atDiv.className = "msgU-attachments";
+          _atDiv.innerHTML = _pendingAttachments.map(function(f) {
+            var _n = f.path.replace(/^.*[\\/]/, '');
+            var _ll = (f.startLine !== undefined && f.endLine !== undefined)
+              ? ':' + f.startLine + (f.endLine !== f.startLine ? '-' + f.endLine : '') : '';
+            return '<span class="chip chip-sent" title="' + escHtml(f.path) + '">' +
+              (f.imageData ? '\ud83d\uddbc\ufe0f' : '\ud83d\udcc4') + ' ' + escHtml(_n) + _ll + '</span>';
+          }).join('');
+          _lastU.appendChild(_atDiv);
+        }
+        _pendingAttachments = null;
+      }
     } else if (m.type === "editFillInput"){
       // Backend truncated history; remove all DOM nodes from the edited msg onward
       var editIdx = _editPendingIdx;
@@ -1858,6 +1909,30 @@
         var builtIn = AT_CMDS.filter(function(c){ return c.name.slice(1).startsWith(q3); });
         var merged = builtIn.concat(fileItems).slice(0, 30);
         if (merged.length) showPop(merged, "at", popTrigStart);
+      }
+    } else if (m.type === "setLiveSelection") {
+      liveSelection = m.payload || null;
+      renderChips();
+    } else if (m.type === "clearLiveSelection") {
+      liveSelection = null;
+      renderChips();
+    } else if (m.type === "addAttachment") {
+      // Extension posted a file/selection attachment via the editor context menu command.
+      var p = m.payload;
+      if (p && p.path) {
+        var isDup = attachedFiles.some(function(f){
+          return f.path === p.path && f.startLine === p.startLine && f.endLine === p.endLine;
+        });
+        if (!isDup) {
+          attachedFiles.push({
+            path:      p.path,
+            content:   p.content || '',
+            startLine: p.startLine,
+            endLine:   p.endLine,
+            lang:      p.lang
+          });
+          renderChips();
+        }
       }
     } else if (m.type === "fileContentResult"){
       // Update the chip's content or imageData

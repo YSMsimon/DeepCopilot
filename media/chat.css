@@ -48,6 +48,8 @@ body.narrow #main{padding-left:12px;padding-right:12px}
 .msgU{background:rgba(128,128,128,.18);outline:1px solid transparent;border-radius:8px 8px 2px 8px;padding:8px 12px;align-self:flex-end;max-width:88%;word-break:break-word;line-height:1.5;position:relative;cursor:pointer;transition:outline-color .15s,background .15s}
 .msgU-hd{display:none}
 .msgU-body{white-space:pre-wrap;word-break:break-word;line-height:1.5;pointer-events:none}
+.msgU-attachments{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;pointer-events:none}
+.chip-sent{font-size:10.5px;padding:1px 7px;border-radius:10px;opacity:.85;pointer-events:none}
 .lbl-you{display:none}
 .msgU:hover{background:rgba(128,128,128,.26);outline-color:var(--vscode-focusBorder,rgba(127,127,127,.6))}
 /* ── Inline edit mode (GH Copilot style) ── */
@@ -278,8 +280,10 @@ body.narrow #ia{padding-left:8px;padding-right:8px}
 #cxb{display:none;font-size:11px;color:var(--vscode-button-background);padding:0 2px 6px}
 /* @file attachment chips */
 #at-chips{display:none;flex-wrap:wrap;gap:4px;padding:6px 10px 2px;max-width:100%}
-.chip{display:inline-flex;align-items:center;gap:3px;background:var(--vscode-badge-background,#0074cc22);color:var(--vscode-badge-foreground,var(--vscode-editor-foreground));border:1px solid var(--vscode-button-background,#0074cc);border-radius:12px;font-size:11px;padding:2px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chip-skill{background:rgba(0,116,204,.12);border-color:var(--vscode-button-background,#0074cc);color:var(--vscode-button-background,#0074cc);max-width:260px;font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:3px;background:var(--vscode-badge-background,#0074cc22);color:var(--vscode-badge-foreground,var(--vscode-editor-foreground));border:1px solid var(--vscode-button-background,#0074cc);border-radius:12px;font-size:11px;padding:2px 8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip-skill{background:rgba(0,116,204,.12);border-color:var(--vscode-button-background,#0074cc);color:var(--vscode-button-background,#0074cc);max-width:300px;font-weight:500}
+.chip-line{opacity:.7;font-size:10.5px;flex-shrink:0}
+.chip-live{background:var(--vscode-editor-selectionBackground,rgba(0,120,215,.18));border-color:var(--vscode-editor-selectionHighlightBorder,rgba(0,120,215,.4))}
 #inp-row{display:flex;align-items:flex-start;width:100%}
 #skill-notice{display:none;align-items:center;gap:5px;background:#0074cc;color:#fff;border-radius:12px;padding:3px 8px 3px 11px;font-size:12px;font-weight:500;white-space:nowrap;flex-shrink:0;margin:8px 0 0 10px;align-self:flex-start}
 #skill-notice .skill-notice-x{background:none;border:none;color:#fff;cursor:pointer;font-size:15px;line-height:1;padding:0;opacity:.75}

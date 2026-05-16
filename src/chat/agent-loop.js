@@ -86,7 +86,9 @@ class AgentLoop {
             const MAX_TOTAL = 256 * 1024;
             let totalSize = 0;
             for (const a of textAttachments) {
-                const block = `<attachment path="${a.path}">\n${a.content || '(empty)'}\n</attachment>`;
+                // Include line range attribute when the attachment is a selection
+                const lineAttr = (a.startLine && a.endLine) ? ` lines="${a.startLine}-${a.endLine}"` : '';
+                const block = `<attachment path="${a.path}"${lineAttr}>\n${a.content || '(empty)'}\n</attachment>`;
                 if (totalSize + block.length > MAX_TOTAL) {
                     attachmentBlocks += `<attachment path="${a.path}">(truncated — total attachment budget exceeded)</attachment>\n\n`;
                     break;
