@@ -29,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_ENDPOINT: https://api.openai.com/v1
-          MODEL: gpt-4.5-preview
+          MODEL: gpt-5.5
           LANGUAGE: Chinese
           PROMPT: |
             你是 DeepCopilot 项目的资深代码审核员，请对本次 PR 的 diff 进行严格审查，重点关注：
