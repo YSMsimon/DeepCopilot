@@ -612,7 +612,15 @@ MIT © [ZhouChaunge](https://github.com/ZhouChaunge). See [LICENSE](./LICENSE).
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ZhouChaunge/DeepCopilot&type=Date)](https://star-history.com/#ZhouChaunge/DeepCopilot&Date)
+## Star History
+
+<a href="https://www.star-history.com/?type=date&repos=ZhouChaunge%2FDeepCopilot">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ZhouChaunge/DeepCopilot&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ZhouChaunge/DeepCopilot&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ZhouChaunge/DeepCopilot&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 
