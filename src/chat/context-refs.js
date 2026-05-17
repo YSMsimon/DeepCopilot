@@ -23,7 +23,7 @@ const path   = require('path');
 const cp     = require('child_process');
 
 const { wsRoot, isInsideWorkspace } = require('../utils/paths');
-const { toolWebFetch } = require('../tools/web-fetch');
+const { fetchAndExtractText } = require('../tools/web-fetch');
 
 const MAX_CONTENT = 64 * 1024;
 
@@ -60,8 +60,17 @@ function resolveEditor() {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return { error: 'No active editor' };
     const doc = editor.document;
+    // Untitled / virtual documents: never expose fileName as a path; use a
+    // synthetic label so the model sees "<untitled>" rather than a host path.
+    if (doc.uri.scheme !== 'file') {
+        return {
+            path:    `<untitled:${doc.uri.scheme}>`,
+            content: truncate(doc.getText()),
+            lang:    doc.languageId,
+        };
+    }
     const abs = doc.fileName;
-    if (doc.uri.scheme === 'file' && !isInsideWorkspace(abs)) {
+    if (!isInsideWorkspace(abs)) {
         return { error: 'Active file is outside the workspace' };
     }
     const root = wsRoot();
@@ -126,18 +135,37 @@ function gitDiff() {
 async function resolveTerminal() {
     const term = vscode.window.activeTerminal;
     if (!term) return { error: 'No active terminal' };
+
+    // The clipboard round-trip below is opt-in (default off) because it can
+    // permanently clobber the user's clipboard on failures and silently
+    // drops non-text clipboard content (e.g. previously-copied images).
+    // See PR #63 review (C7) and issue #62.
+    const cfg = vscode.workspace.getConfiguration('deepseekAgent');
+    const allowClipboard = !!cfg.get('contextRefs.terminalUseClipboard', false);
+    if (!allowClipboard) {
+        return {
+            error: 'Enable "deepseekAgent.contextRefs.terminalUseClipboard" to capture terminal selection (it temporarily uses the system clipboard).',
+        };
+    }
+
     // VS Code does not expose terminal scrollback via the public API. We grab
-    // the current terminal selection if available, otherwise return a marker
-    // line so the model knows the user *intended* to share terminal context.
+    // the current terminal selection via copySelection → read clipboard,
+    // then restore the previous clipboard content.
     let buffer = '';
+    let prev = '';
+    let prevReadOk = false;
     try {
-        // executeCommand returns void/clipboard text depending on version.
-        // We attempt copySelection → read clipboard, and restore.
-        const prev = await vscode.env.clipboard.readText().catch(() => '');
+        try { prev = await vscode.env.clipboard.readText(); prevReadOk = true; } catch { /* may be empty / non-text */ }
         await vscode.commands.executeCommand('workbench.action.terminal.copySelection').then(() => {}, () => {});
-        const sel  = await vscode.env.clipboard.readText().catch(() => '');
-        // restore previous clipboard content
-        if (prev !== sel) await vscode.env.clipboard.writeText(prev).catch(() => {});
+        // Give the OS clipboard a moment to settle before reading (issue G1).
+        await new Promise(r => setTimeout(r, 50));
+        const sel = await vscode.env.clipboard.readText().catch(() => '');
+        // Only restore when we successfully captured the previous value AND
+        // it differs from what we just read, to avoid wiping non-text content
+        // we never saw.
+        if (prevReadOk && prev !== sel) {
+            await vscode.env.clipboard.writeText(prev).catch(() => {});
+        }
         buffer = sel || '';
     } catch { /* ignore */ }
     if (!buffer.trim()) {
@@ -183,19 +211,17 @@ async function resolveSymbol(query) {
 async function resolveFetch(url, abortSignal) {
     const u = String(url || '').trim();
     if (!u) return { error: 'Provide a URL, e.g. #fetch:https://example.com' };
-    const body = await toolWebFetch({ url: u }, { abortSignal });
-    if (typeof body === 'string' && body.startsWith('Error:')) {
-        return { error: body.slice('Error:'.length).trim() };
-    }
+    const res = await fetchAndExtractText({ url: u }, { abortSignal });
+    if (!res.ok) return { error: res.error };
     return {
         path:    `<fetch:${u}>`,
-        content: truncate(body, 32 * 1024),
+        content: truncate(res.body, 32 * 1024),
     };
 }
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
-const KNOWN_REFS = ['selection', 'editor', 'problems', 'changes', 'terminal', 'symbol', 'fetch'];
+const KNOWN_REFS = ['file', 'selection', 'editor', 'problems', 'changes', 'terminal', 'symbol', 'fetch'];
 
 async function resolveContextRef(refType, value, ctx = {}) {
     switch (refType) {

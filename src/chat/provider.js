@@ -346,8 +346,13 @@ class ChatViewProvider {
                             const result = await resolveContextRef(r.refType, r.value);
                             if (result && !result.error) {
                                 attachments.push(result);
-                                // Also echo a chip in the user bubble for visibility
-                                this._post({ type: 'addAttachment', payload: result });
+                                // Echo a chip into the CURRENT user bubble.
+                                // Posting `addPendingAttachment` BEFORE the loop
+                                // fires `userEcho` ensures the webview merges
+                                // these into `_pendingAttachments`, which is
+                                // flushed by the next userEcho handler
+                                // (see media/chat.js).
+                                this._post({ type: 'addPendingAttachment', payload: result });
                             } else if (result && result.error) {
                                 this._post({ type: 'error', text: `#${r.refType}:${r.value} — ${result.error}` });
                             }
@@ -623,7 +628,7 @@ class ChatViewProvider {
             let content = doc.getText(sel);
             const startLine = sel.start.line + 1;
             const endLine   = sel.end.line + 1;
-            if (content.length > 12000) content = content.slice(0, 12000) + '\n... [截断]';
+            if (content.length > 12000) content = content.slice(0, 12000) + (isZh() ? '\n... [截断]' : '\n... [truncated]');
             this._post({ type: 'setLiveSelection', payload: { path: rel, content, startLine, endLine, lang } });
         } else {
             // File is open but no selection: include the full document content
@@ -631,7 +636,7 @@ class ChatViewProvider {
             const FILE_CAP = 60 * 1024; // 60KB cap to keep payload reasonable
             let content = doc.getText();
             const truncated = content.length > FILE_CAP;
-            if (truncated) content = content.slice(0, FILE_CAP) + '\n... [文件超出 60KB 已截断]';
+            if (truncated) content = content.slice(0, FILE_CAP) + (isZh() ? '\n... [文件超出 60KB 已截断]' : '\n... [file exceeded 60KB and was truncated]');
             this._post({ type: 'setLiveSelection', payload: { path: rel, content, lang } });
         }
     }

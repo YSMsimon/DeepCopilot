@@ -7,8 +7,6 @@
   var inp  = document.getElementById("inp");
   var sbtn = document.getElementById("sbtn");
   var es   = document.getElementById("es");
-  var cxb  = document.getElementById("cxb");
-  var cxbt = document.getElementById("cxbt");
   var apibt = document.getElementById("apibt");
   var edgeL = document.getElementById("edgeL");
   var edgeR = document.getElementById("edgeR");
@@ -101,7 +99,7 @@
   var planCnt = document.getElementById("plan-cnt");
   var todoBody = document.getElementById("todo-body");
   var todoCnt = document.getElementById("todo-cnt");
-  var cxOn = false, busy = false;
+  var busy = false;
   var cur = null, curText = "", curThk = null, curThkHead = null, curBubble = null;
   var toolMap = {};
   var _userMsgCount = 0; // tracks index of each .msgU for editUserMessage
@@ -1140,9 +1138,9 @@
     { name: "/clear",    desc: "清空当前会话",             expand: "__CLEAR__" },
   ];
   var AT_CMDS = [
-    { name: "@file",      desc: "附带当前打开的文件",   action: "ctxOn" },
-    { name: "@selection", desc: "附带编辑器中选中的代码", action: "ctxOn" },
-    { name: "@terminal",  desc: "附带终端最近输出(占位)", action: "noop" },
+    { name: "@file",      desc: "附带当前打开的文件",   action: "refEditor" },
+    { name: "@selection", desc: "附带编辑器中选中的代码", action: "refSelection" },
+    { name: "@terminal",  desc: "附带终端选中文本",          action: "refTerminal" },
   ];
   // ── # context references (GitHub Copilot–style) ────────────────────────
   // Each entry is either:
@@ -1337,8 +1335,12 @@
           renderChips();
           requestFileContent(fp);
         }
-      } else if (it.action === "ctxOn" && !cxOn) {
-        cxbt && cxbt.click();
+      } else if (it.action === "refEditor") {
+        vscode.postMessage({ type: "resolveContextRef", refType: "editor" });
+      } else if (it.action === "refSelection") {
+        vscode.postMessage({ type: "resolveContextRef", refType: "selection" });
+      } else if (it.action === "refTerminal") {
+        vscode.postMessage({ type: "resolveContextRef", refType: "terminal" });
       }
       setTimeout(function(){ inp.focus(); inp.setSelectionRange(b2.length, b2.length); }, 0);
     } else if (popKind === "hash"){
@@ -1588,23 +1590,40 @@
     renderPlan([]);
     curBubble = null; cur = null; curText = ""; curThk = null; toolMap = {}; _userMsgCount = 0; _editPendingIdx = -1;
   }
-  // Detect "#<ref>:<arg> " (trailing space) and convert it to a resolved chip
-  // via the extension side. The token is stripped from the input box.
+  // Detect "#<ref>:<arg>" tokens that have been explicitly committed by the
+  // user. To avoid mangling legitimate text like "#symbol:Foo bar baz" (where
+  // a single space is part of the argument), we ONLY commit when:
+  //   • the token is followed by two consecutive spaces, OR
+  //   • the token is followed by a newline, OR
+  //   • the caret is NOT inside the token (i.e. user moved past it / pasted).
+  // Otherwise leave the token alone — `doSend()` still has a fallback that
+  // strips uncommitted tokens at send time, so nothing is lost.
   function commitHashRefArgs(){
     var v = inp.value;
-    var re = /(^|\s)#(symbol|fetch):(\S+)(\s)/g;
-    var m, replaced = false, out = v;
+    var caret = inp.selectionStart || 0;
+    // Match each token plus what immediately follows it.
+    var re = /(^|\s)#(symbol|fetch):(\S+?)(  |\n)/g;
+    var m, replaced = false;
+    var ranges = []; // {start,end} of segments to drop
     while ((m = re.exec(v)) !== null) {
+      var tokStart = m.index + (m[1] ? m[1].length : 0);
+      var tokEnd   = m.index + m[0].length; // includes the trailing terminator
+      // Skip if the caret is still inside this token — the user is typing.
+      if (caret > tokStart && caret <= tokEnd) continue;
       vscode.postMessage({ type: "resolveContextRef", refType: m[2], value: m[3] });
+      ranges.push({ start: tokStart, end: tokEnd, lead: m[1] || "" });
       replaced = true;
     }
     if (replaced) {
-      // Strip every matched token (keep one separating space).
-      out = v.replace(/(^|\s)#(?:symbol|fetch):(\S+)\s/g, function(_, lead){ return lead || ""; });
-      var pos = inp.selectionStart || 0;
+      // Apply removals from the end so earlier offsets stay valid.
+      var out = v;
+      for (var i = ranges.length - 1; i >= 0; i--) {
+        var r = ranges[i];
+        // Keep the leading whitespace, drop the rest of the matched segment.
+        out = out.slice(0, r.start) + out.slice(r.end);
+      }
       inp.value = out;
-      // Best-effort caret keep
-      var newPos = Math.min(out.length, pos);
+      var newPos = Math.min(out.length, caret);
       try { inp.setSelectionRange(newPos, newPos); } catch (_e) {}
       autosize();
     }
@@ -1646,12 +1665,6 @@
     else if (e.key === "Escape" && busy){ e.preventDefault(); _stopping = true; if (_dcSpinner) _dcSpinner.classList.add("stopping"); vscode.postMessage({type:"stop"}); }
   });
   sbtn.addEventListener("click", doSend);
-  cxbt && cxbt.addEventListener("click", function(){
-    cxOn = !cxOn;
-    cxbt.classList.toggle("active", cxOn);
-    cxb.style.display = cxOn ? "block" : "none";
-    vscode.postMessage({type:"contextToggle", active:cxOn});
-  });
   modelBtn && modelBtn.addEventListener("click", function(e){
     e.stopPropagation();
     _modelOpen ? closeModelDrop() : openModelDrop();
@@ -2255,6 +2268,19 @@
           });
           renderChips();
         }
+      }
+    } else if (m.type === "addPendingAttachment") {
+      // Extension resolved an inline `#ref:arg` during send(): we need the
+      // chip to appear inside the CURRENT user bubble (not the next turn's
+      // input), so we splice it into the pending-snapshot array that
+      // `userEcho` flushes. doSend() has already cleared `attachedFiles`.
+      var pp = m.payload;
+      if (pp && pp.path) {
+        if (!_pendingAttachments) _pendingAttachments = [];
+        var dup = _pendingAttachments.some(function(f){
+          return f.path === pp.path && f.startLine === pp.startLine && f.endLine === pp.endLine;
+        });
+        if (!dup) _pendingAttachments.push(pp);
       }
     } else if (m.type === "fileContentResult"){
       // Update the chip's content or imageData
