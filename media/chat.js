@@ -53,6 +53,22 @@
     modelDrop.style.display = "none";
     _modelOpen = false;
   }
+  /* ── Interaction Mode toggle (Agent ↔ Plan) ── */
+  var iModePicker = document.getElementById("iModePicker");
+  var iModeBtn    = document.getElementById("iModeBtn");
+  var _curIMode   = "agent"; // tracks current interaction mode for ft-mode display
+  var INTERACTION_MODES = [
+    { value: "agent", icon: "tools",       name: "Agent", desc: "自主调用工具完成任务（文件读写、Shell、搜索等）" },
+    { value: "plan",  icon: "list-ordered", name: "Plan",  desc: "只探索代码库、生成可审阅的计划，不执行任何写操作" },
+  ];
+  function setIModeUI(mode){
+    var md = INTERACTION_MODES.find(function(x){ return x.value === mode; }) || INTERACTION_MODES[0];
+    _curIMode = md.value;
+    if (iModePicker) iModePicker.dataset.im = mode;
+    if (iModeBtn) iModeBtn.innerHTML = "<i class='codicon codicon-" + md.icon + "'></i> " + md.name;
+  }
+
+  /* ── Approval Mode picker (Manual / Auto-Edit / Autopilot / Read-Only) ── */
   var modePicker = document.getElementById("modePicker");
   var modeBtn    = document.getElementById("modeBtn");
   var modeDrop   = document.getElementById("modeDrop");
@@ -1693,6 +1709,12 @@
     vscode.postMessage({type:"setModel", model: model});
     closeModelDrop();
   });
+  iModeBtn && iModeBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    var next = _curIMode === "agent" ? "plan" : "agent";
+    setIModeUI(next);
+    vscode.postMessage({type:"setInteractionMode", mode: next});
+  });
   modeBtn && modeBtn.addEventListener("click", function(e){
     e.stopPropagation();
     _modeOpen ? closeModeDrop() : openModeDrop();
@@ -2195,7 +2217,13 @@
     } else if (m.type === "modelInfo"){
       if (m.model){
         setModelUI(m.model);
-        ftMode.textContent = "agent · " + m.model;
+        ftMode.textContent = _curIMode + " · " + m.model;
+      }
+      if (m.interactionMode){
+        setIModeUI(m.interactionMode);
+        // refresh footer with updated interaction mode
+        var _curModel = (modelPicker && modelPicker.dataset.model) || "deepseek-v4-pro";
+        ftMode.textContent = m.interactionMode + " · " + _curModel;
       }
       if (m.approvalMode){ setModeUI(m.approvalMode); }
     } else if (m.type === "balanceUpdate"){

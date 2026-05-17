@@ -88,6 +88,7 @@ const EN = {
     wvCacheTitle:       'Prompt cache hit rate (higher = cheaper)',
     wvSwitchModel:      'Switch model',
     wvApprovalMode:     'Approval Mode',
+    wvInteractionMode:  'Interaction Mode',
     wvBalanceTitle:     'Account balance (click to refresh)',
     wvBalanceInit:      '💰 Checking...',
 
@@ -175,6 +176,7 @@ const ZH = {
     wvCacheTitle:       'prompt 缓存命中率（越高越省钱）',
     wvSwitchModel:      '切换模型',
     wvApprovalMode:     '批准策略 (Approval Mode)',
+    wvInteractionMode:  '交互模式',
     wvBalanceTitle:     '账户余额（点击刷新）',
     wvBalanceInit:      '💰 查询中…',
 

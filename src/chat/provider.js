@@ -145,7 +145,7 @@ class ChatViewProvider {
         switch (msg.type) {
             case 'ready': {
                 const cfg = vscode.workspace.getConfiguration('deepseekAgent');
-                this._post({ type: 'modelInfo', model: cfg.get('defaultModel') || 'deepseek-v4-pro', approvalMode: cfg.get('approvalMode') || 'manual' });
+                this._post({ type: 'modelInfo', model: cfg.get('defaultModel') || 'deepseek-v4-pro', approvalMode: cfg.get('approvalMode') || 'manual', interactionMode: cfg.get('interactionMode') || 'agent' });
                 this._store.postList();
                 if (!this._store.sessionId) this._post({ type: 'sessionLoaded', id: null, messages: [] });
                 this._refreshBalance(false);
@@ -169,6 +169,12 @@ class ChatViewProvider {
             case 'sessionPin':     this._store.pin(msg.id); break;
             case 'sessionUnread':  this._store.unread(msg.id); break;
             case 'sessionArchive': this._store.archive(msg.id); break;
+            case 'setInteractionMode': {
+                const cfg = vscode.workspace.getConfiguration('deepseekAgent');
+                cfg.update('interactionMode', msg.mode, vscode.ConfigurationTarget.Global)
+                    .then(() => this._post({ type: 'modelInfo', interactionMode: msg.mode }));
+                break;
+            }
             case 'setMode': {
                 const cfg = vscode.workspace.getConfiguration('deepseekAgent');
                 cfg.update('approvalMode', msg.mode, vscode.ConfigurationTarget.Global)
