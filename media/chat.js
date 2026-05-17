@@ -1652,7 +1652,7 @@
     if (popVisible){
       if (e.key === "ArrowDown"){ e.preventDefault(); movePop(1); return; }
       if (e.key === "ArrowUp")  { e.preventDefault(); movePop(-1); return; }
-      if (e.key === "Tab" || e.key === "Enter"){
+      if (e.key === "Tab" || (e.key === "Enter" && !e.isComposing)){
         e.preventDefault(); applyPop(); return;
       }
       if (e.key === "Escape"){ e.preventDefault(); hidePop(); return; }
