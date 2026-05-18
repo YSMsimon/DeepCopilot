@@ -31,6 +31,7 @@ function buildWebviewHtml(webview, extensionUri) {
         cacheTitle:      t('wvCacheTitle'),
         switchModel:     t('wvSwitchModel'),
         approvalMode:    t('wvApprovalMode'),
+        interactionMode: t('wvInteractionMode'),
         balanceTitle:    t('wvBalanceTitle'),
         balanceInit:     t('wvBalanceInit'),
     };
@@ -106,6 +107,9 @@ function buildWebviewHtml(webview, extensionUri) {
     </div>
     <div id="composer-bar">
       <div class="cb-left">
+        <div id="iModePicker" class="mode-picker" data-im="agent">
+          <button id="iModeBtn" class="cbtn mode-trigger" title="${ui.interactionMode}"><i class="codicon codicon-tools"></i> Agent</button>
+        </div>
         <div id="modelPicker" class="mode-picker" data-model="deepseek-v4-pro">
           <button id="modelBtn" class="cbtn mode-trigger" title="${ui.switchModel}">⚡ v4-pro <span class="mode-chev">▾</span></button>
           <div id="modelDrop" class="mode-drop" style="display:none"></div>
