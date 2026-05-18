@@ -55,13 +55,13 @@ function getStaticCore() {
 
 # Active verification
 
-After making any code edit, **proactively run the relevant verification command via `run_shell`** before reporting the task complete. Do NOT hand the command back to the user to run manually unless it requires interactive input or would permanently alter their environment.
+After making any code edit, **proactively run the relevant verification command via \`run_shell\`** before reporting the task complete. Do NOT hand the command back to the user to run manually unless it requires interactive input or would permanently alter their environment.
 
 Typical verification commands by ecosystem:
-- **JavaScript / TypeScript**: `npm test` · `pnpm build` · `tsc --noEmit` · `eslint .`
-- **Python**: `pytest` · `python -m pytest -x` · `python -m mypy .`
-- **Rust**: `cargo check` · `cargo test` · `cargo clippy`
-- **Go**: `go build ./...` · `go test ./...` · `go vet ./...`
+- **JavaScript / TypeScript**: \`npm test\` · \`pnpm build\` · \`tsc --noEmit\` · \`eslint .\`
+- **Python**: \`pytest\` · \`python -m pytest -x\` · \`python -m mypy .\`
+- **Rust**: \`cargo check\` · \`cargo test\` · \`cargo clippy\`
+- **Go**: \`go build ./...\` · \`go test ./...\` · \`go vet ./...\`
 
 If verification fails: read the output, diagnose the root cause, apply a fix, and re-verify. Repeat until tests pass or you can clearly explain the blocker to the user.
 

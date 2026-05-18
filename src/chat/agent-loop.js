@@ -218,7 +218,7 @@ class AgentLoop {
         //   Cleared once run_shell is first called in this turn.
         // verifyNudgeEmitted: ensures we inject the reminder at most once per turn.
         // shellFailCounts: tracks consecutive failures per normalized command.
-        const FIX_KEYWORDS = /修复|fix|报错|error|不工作|broken|失败|fail/i;
+        const FIX_KEYWORDS = /修复|报错|不工作|失败|\bfix\b|\berror\b|\bbroken\b|\bfail\b/i;
         let wantsVerifyNudge  = FIX_KEYWORDS.test(typeof text === 'string' ? text : '');
         let verifyNudgeEmitted = false;
         const shellFailCounts = new Map();
