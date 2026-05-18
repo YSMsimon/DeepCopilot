@@ -379,6 +379,17 @@
     return "<div class=\"math-block\">" + renderMathSafe(m.tex.trim(), true) + "</div>";
   }
 
+  /* Extract the human-readable text from a run_shell result.
+     shell.js returns a JSON object with a `text` field for normal exits;
+     error/timeout paths return a plain string.  This helper handles both. */
+  function getShellText(out) {
+    try {
+      var p = JSON.parse(out);
+      if (p && p.text !== undefined) return p.text;
+    } catch(e) {}
+    return out;
+  }
+
   function renderMd(s){
     /* ─── Whitelisted HTML passthrough (Issue #35) ───────────────
        Park raw <tag>/</tag> tokens for safe tags BEFORE any escaping
@@ -2135,11 +2146,7 @@
                        : elapsed >=  1 ? elapsed.toFixed(1) + "s"
                        :                 Math.max(1, Math.round(elapsed * 1000)) + "ms";
         /* Resolve display text: unwrap JSON text field when present */
-        var shellDisplayOut = out;
-        try {
-          var shellParsed = JSON.parse(out);
-          if (shellParsed && shellParsed.text !== undefined) shellDisplayOut = shellParsed.text;
-        } catch(e) {}
+        var shellDisplayOut = getShellText(out);
         var shellLines = shellDisplayOut ? shellDisplayOut.split(/\r?\n/).length : 0;
         var shellBytes = shellDisplayOut.length;
         /* Prefer the exitCode field forwarded by tool-executor; fall back to text parsing */
@@ -2178,11 +2185,7 @@
              When shell.js returns a structured JSON object, show the human-readable
              `text` field rather than raw JSON. */
           if (tc._livePre){ tc._livePre.remove(); tc._livePre = null; }
-          var runShellBody = out;
-          try {
-            var rsParsed = JSON.parse(out);
-            if (rsParsed && rsParsed.text !== undefined) runShellBody = rsParsed.text;
-          } catch(e) {}
+          var runShellBody = getShellText(out);
           var outPre = document.createElement("pre");
           outPre.className = "final-out";
           outPre.textContent = runShellBody;

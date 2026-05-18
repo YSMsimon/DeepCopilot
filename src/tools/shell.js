@@ -235,8 +235,8 @@ async function toolRunShell(args, ctx = {}) {
             return settle({
                 command,
                 exitCode,
-                stdout: truncate(stdout),
-                stderr: truncate(stderr),
+                stdout,
+                stderr,
                 truncated: combinedSize >= MAX_BUF,
                 text,
             });

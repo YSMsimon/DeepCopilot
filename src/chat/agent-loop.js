@@ -559,9 +559,25 @@ class AgentLoop {
                     if (tc.name === 'run_shell' && resStr.length > COMPRESS_THRESHOLD && SHELL_ERROR_PAT.test(resStr)) {
                         const lastMsg = run.messages[run.messages.length - 1];
                         if (lastMsg && lastMsg.role === 'tool' && lastMsg.tool_call_id === tc.id) {
-                            const head = resStr.slice(0, 300);
-                            const tail = resStr.slice(-100);
-                            lastMsg.content = `${head}\n...[error output compressed: ${resStr.length} chars total]...\n${tail}`;
+                            // Compress the `text` field inside the JSON to preserve a valid
+                            // structured payload; only fall back to raw-string slicing when
+                            // the result is not a JSON object (old error-path strings).
+                            let compressed = resStr;
+                            try {
+                                const parsed = JSON.parse(resStr);
+                                if (parsed && typeof parsed.text === 'string' && parsed.text.length > COMPRESS_THRESHOLD) {
+                                    const head = parsed.text.slice(0, 300);
+                                    const tail = parsed.text.slice(-100);
+                                    parsed.text = `${head}\n...[compressed: ${parsed.text.length} chars total]...\n${tail}`;
+                                    compressed = JSON.stringify(parsed);
+                                }
+                            } catch {
+                                // Plain string result (error/timeout path) — slice the raw string.
+                                const head = resStr.slice(0, 300);
+                                const tail = resStr.slice(-100);
+                                compressed = `${head}\n...[error output compressed: ${resStr.length} chars total]...\n${tail}`;
+                            }
+                            lastMsg.content = compressed;
                             Logger.info('TOOL_RESULT_COMPRESSED', { tool: tc.name, original: resStr.length, compressed: lastMsg.content.length });
                         }
                     }
@@ -576,9 +592,7 @@ class AgentLoop {
                         // shell.js returns a JSON object on normal exit and a plain string
                         // on error paths; check both representations.
                         const isShellFailure = (() => {
-                            if (resStr.startsWith('{')) {
-                                try { const p = JSON.parse(resStr); return p.exitCode !== 0; } catch {}
-                            }
+                            try { const p = JSON.parse(resStr); return p.exitCode !== 0; } catch {}
                             return /^(?:Exit |Error:)/.test(resStr);
                         })();
                         let cmdKey = '';
