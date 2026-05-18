@@ -240,8 +240,26 @@ class ChatViewProvider {
                         const https = require('https');
                         const http  = require('http');
                         const base  = resolved.baseUrl.replace(/\/$/, '');
-                        const urlObj = new URL('/chat/completions', base);
-                        const body   = JSON.stringify({ model: resolved.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 });
+                        const isAnthropic = provider === 'anthropic';
+                        // Anthropic uses a different endpoint and auth scheme from OpenAI-compat providers.
+                        const urlObj  = isAnthropic
+                            ? new URL('/v1/messages', base)
+                            : new URL('/chat/completions', base);
+                        const body    = isAnthropic
+                            ? JSON.stringify({ model: resolved.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 })
+                            : JSON.stringify({ model: resolved.model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 });
+                        const headers = isAnthropic
+                            ? {
+                                'x-api-key':         testKey || '',
+                                'anthropic-version': '2023-06-01',
+                                'Content-Type':      'application/json',
+                                'Content-Length':    Buffer.byteLength(body),
+                            }
+                            : {
+                                'Authorization':  `Bearer ${testKey || 'ollama'}`,
+                                'Content-Type':   'application/json',
+                                'Content-Length': Buffer.byteLength(body),
+                            };
                         const isHttps = urlObj.protocol === 'https:';
                         const result = await new Promise((resolve) => {
                             const req = (isHttps ? https : http).request({
@@ -249,11 +267,7 @@ class ChatViewProvider {
                                 port:     urlObj.port || (isHttps ? 443 : 80),
                                 path:     urlObj.pathname,
                                 method:   'POST',
-                                headers:  {
-                                    'Authorization': `Bearer ${testKey || 'ollama'}`,
-                                    'Content-Type': 'application/json',
-                                    'Content-Length': Buffer.byteLength(body),
-                                },
+                                headers,
                                 timeout:  10000,
                             }, (res) => {
                                 let raw = '';
