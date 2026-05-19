@@ -436,28 +436,35 @@ class ChatViewProvider {
             case 'openFilePicker': {
                 try {
                     // Open tabs first — most relevant to the user's current context.
+                    // Use fsPath for deduplication to avoid multi-root ambiguity.
                     const openItems = vscode.workspace.textDocuments
                         .filter(d => d.uri.scheme === 'file')
                         .map(d => ({
                             label:       vscode.workspace.asRelativePath(d.uri, false),
                             description: '● open',
+                            fsPath:      d.uri.fsPath,
                         }));
-                    const openSet = new Set(openItems.map(p => p.label));
+                    const openSet = new Set(openItems.map(p => p.fsPath));
 
-                    // All workspace files excluding noise directories.
+                    // All workspace files — exclude same dirs as FOLDER_TREE_SKIP for consistency.
                     const found = await vscode.workspace.findFiles(
                         '**/*',
-                        '{**/node_modules/**,**/.git/**,**/out/**,**/.vscode/**}',
+                        '{**/node_modules/**,**/.git/**,**/out/**,**/.vscode/**,**/dist/**,**/build/**}',
                         500,
                     );
                     const wsItems = found
-                        .map(u => ({ label: vscode.workspace.asRelativePath(u, false), description: '' }))
-                        .filter(p => !openSet.has(p.label));
+                        .map(u => ({
+                            label:   vscode.workspace.asRelativePath(u, false),
+                            description: '',
+                            fsPath:  u.fsPath,
+                        }))
+                        .filter(p => !openSet.has(p.fsPath));
 
                     const picked = await vscode.window.showQuickPick([...openItems, ...wsItems], {
-                        placeHolder: 'Search and select a file…',
+                        placeHolder: isZh() ? '搜索并选择文件…' : 'Search and select a file…',
                         matchOnDescription: false,
                     });
+                    // Send relative label — keeps chip display clean; resolvePath handles it.
                     this._post({ type: 'filePickerResult', path: picked ? picked.label : null });
                 } catch (e) {
                     this._post({ type: 'filePickerResult', path: null });
