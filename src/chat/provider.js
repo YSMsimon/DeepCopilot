@@ -433,6 +433,37 @@ class ChatViewProvider {
                 this._post({ type: 'fileSearchResults', query: msg.query, files });
                 break;
             }
+            case 'openFilePicker': {
+                try {
+                    // Open tabs first — most relevant to the user's current context.
+                    const openItems = vscode.workspace.textDocuments
+                        .filter(d => d.uri.scheme === 'file')
+                        .map(d => ({
+                            label:       vscode.workspace.asRelativePath(d.uri, false),
+                            description: '● open',
+                        }));
+                    const openSet = new Set(openItems.map(p => p.label));
+
+                    // All workspace files excluding noise directories.
+                    const found = await vscode.workspace.findFiles(
+                        '**/*',
+                        '{**/node_modules/**,**/.git/**,**/out/**,**/.vscode/**}',
+                        500,
+                    );
+                    const wsItems = found
+                        .map(u => ({ label: vscode.workspace.asRelativePath(u, false), description: '' }))
+                        .filter(p => !openSet.has(p.label));
+
+                    const picked = await vscode.window.showQuickPick([...openItems, ...wsItems], {
+                        placeHolder: 'Search and select a file…',
+                        matchOnDescription: false,
+                    });
+                    this._post({ type: 'filePickerResult', path: picked ? picked.label : null });
+                } catch (e) {
+                    this._post({ type: 'filePickerResult', path: null });
+                }
+                break;
+            }
             case 'fileContent': {
                 const rel    = String(msg.path || '');
                 let content  = '', error = '', imageData = '';
