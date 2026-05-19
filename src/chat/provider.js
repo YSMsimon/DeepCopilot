@@ -461,7 +461,7 @@ class ChatViewProvider {
                     // All workspace files — exclude same dirs as FOLDER_TREE_SKIP for consistency.
                     const found = await vscode.workspace.findFiles(
                         '**/*',
-                        '{**/node_modules/**,**/.git/**,**/out/**,**/.vscode/**,**/dist/**,**/build/**}',
+                        '{**/node_modules/**,**/.git/**,**/out/**,**/.vscode/**,**/dist/**,**/build/**,**/__pycache__/**,**/.venv/**,**/venv/**,**/.next/**,**/coverage/**,**/.turbo/**}',
                         500,
                     );
                     const wsItems = found
@@ -476,8 +476,8 @@ class ChatViewProvider {
                         placeHolder: isZh() ? '搜索并选择文件…' : 'Search and select a file…',
                         matchOnDescription: false,
                     });
-                    // Send relative label — keeps chip display clean; resolvePath handles it.
-                    this._post({ type: 'filePickerResult', path: picked ? picked.label : null });
+                    // Send fsPath — avoids multi-root ambiguity; resolvePath handles absolute paths.
+                    this._post({ type: 'filePickerResult', path: picked ? picked.fsPath : null });
                 } catch (e) {
                     this._post({ type: 'filePickerResult', path: null });
                 }

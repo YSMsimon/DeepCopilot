@@ -1424,7 +1424,7 @@
     pop.style.display = "block";
     popVisible = true;
   }
-  function hidePop(){ if (popVisible){ pop.style.display = "none"; popVisible = false; popItems = []; popKind = ""; } }
+  function hidePop(){ if (popVisible){ pop.style.display = "none"; popVisible = false; popItems = []; } popKind = ""; popTrigStart = 0; }
   function movePop(d){
     popSel = (popSel + d + popItems.length) % popItems.length;
     var nodes = pop.querySelectorAll(".popi");
@@ -1575,8 +1575,12 @@
       if (matches.length) {
         showPop(matches, "hash", start);
       } else if (q4.length > 0) {
-        // No built-in matches but file search is in flight — preserve state
+        // No built-in matches but file search is in flight — preserve kind/start
         // so fileSearchResults can populate the popup when it arrives.
+        // Explicitly clear stale items and hide the popup visually to avoid
+        // showing stale suggestions that no longer match the current token.
+        if (popVisible) { pop.style.display = "none"; popVisible = false; }
+        popItems = [];
         popKind = "hash"; popTrigStart = start;
       } else {
         showPop(matches, "hash", start);
